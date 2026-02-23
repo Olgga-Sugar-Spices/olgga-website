@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Category {
+  SPICES
+  SUGAR
+  SPICE_BLENDS
+  HERBS
+  SALT
+  GIFT_BOXES
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  category      Category
+
+  price         Int
+  mrp           Int
+  discount      Int
+
+  weight        String
+  rating        Float
+  reviews       Int
+
+  image         String
+
+  isOrganic     Boolean  @default(false)
+  isBestseller  Boolean  @default(false)
+  isFeatured    Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
