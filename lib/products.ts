@@ -19,10 +19,15 @@ export async function getProducts(params?: {
     searchParams.append("search", params.search);
   }
 
-  const res = await fetch(
-    `/api/products?${searchParams.toString()}`,
-    { cache: "no-store" }
-  );
+  const base =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.VERCEL_URL?.startsWith("http")
+      ? process.env.VERCEL_URL
+      : `https://${process.env.VERCEL_URL}`;
+
+  const url = `${base}/api/products?${searchParams.toString()}`;
+
+  const res = await fetch(url, { cache: "no-store" });
 
   if (!res.ok) {
     throw new Error("Failed to fetch products");
