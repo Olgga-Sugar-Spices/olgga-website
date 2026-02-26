@@ -1,7 +1,5 @@
 import { Product } from "@/types/product";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
 export async function getProducts(params?: {
   category?: string;
   featured?: boolean;
@@ -22,7 +20,7 @@ export async function getProducts(params?: {
   }
 
   const res = await fetch(
-    `${BASE_URL}/api/products?${searchParams.toString()}`,
+    `/api/products?${searchParams.toString()}`,
     { cache: "no-store" }
   );
 
