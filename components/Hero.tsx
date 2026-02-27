@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Hero() {
   return (
-    <section className="bg-gradient-to-r from-[#000000] to-[#8B6B1F] py-24 flex items-center px-8">
+    <section className="bg-gradient-to-r from-[#000000] to-[#8B6B1F] min-h-[50vh] flex items-center px-8">
       <div className="max-w-2xl text-white">
         
         {/* Badge */}
