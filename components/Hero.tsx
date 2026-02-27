@@ -12,7 +12,7 @@ export default function Hero() {
 
         {/* Heading */}
         <h1 className="text-5xl font-bold mt-6 leading-tight">
-          The Finest <span className="text-yellow-300">Spices & Sugars</span>
+          The Finest <span className="text-yellow-300">Dryfryuits & Honey</span>
           <br /> From India
         </h1>
 
