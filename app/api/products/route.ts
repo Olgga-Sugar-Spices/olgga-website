@@ -22,6 +22,11 @@ export async function GET(req: Request) {
     query = query.ilike("name", `%${search}%`);
   }
 
+  query = query.order("display_order", {
+    ascending: true,
+    nullsFirst: false,
+  });
+
   const { data, error } = await query;
 
   if (error) {
