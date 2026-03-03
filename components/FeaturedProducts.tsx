@@ -21,7 +21,7 @@ export default async function FeaturedProducts() {
 
           <a
             href="/shop"
-            className="border border-yellow-300 text-yellow-300 px-5 py-2 rounded-full font-medium flex items-center gap-2 hover:bg-yellow-300 hover:text-white transition"
+            className="border border-yellow-300 text-yellow-300 px-5 py-2 rounded-full font-medium flex items-center gap-2 whitespace-nowrap hover:bg-yellow-300 hover:text-white transition"
           >
             View All →
           </a>
