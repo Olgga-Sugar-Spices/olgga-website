@@ -15,7 +15,7 @@ export default function Hero() {
       <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-6 leading-tight">
         The Finest{" "}
         <span className="text-yellow-300">
-          Dryfruits & Honey
+          Dryfruits & Honey{" "}
         </span>
         <br className="hidden sm:block" />
         From India
