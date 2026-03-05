@@ -14,7 +14,7 @@ export default function TopBar() {
           </p>
 
           <p className="text-center sm:text-right">
-            📞 +91 98765 43210
+            📞 +91 93101 95305
           </p>
 
         </div>
