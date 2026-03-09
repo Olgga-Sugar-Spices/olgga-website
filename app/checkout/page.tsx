@@ -23,9 +23,16 @@ export default function CheckoutPage() {
   const [showForm, setShowForm] = useState(false);
 
   async function fetchAddresses() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
     const { data } = await supabase
       .from("addresses")
       .select("*")
+      .eq("user_id", user.id)
       .order("is_default", { ascending: false });
 
     setAddresses(data || []);
@@ -57,14 +64,21 @@ export default function CheckoutPage() {
   }
 
   async function setDefault(id: string) {
-    await supabase.from("addresses").update({ is_default: false });
-    await supabase.from("addresses").update({ is_default: true }).eq("id", id);
+    await supabase
+      .from("addresses")
+      .update({ is_default: false });
+
+    await supabase
+      .from("addresses")
+      .update({ is_default: true })
+      .eq("id", id);
+
     fetchAddresses();
   }
 
   return (
     <div className="bg-black min-h-screen">
-      <div className="max-w-5xl mx-auto px-8 py-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
 
         <h1 className="text-4xl font-bold mb-10 text-yellow-300">
           Checkout
@@ -86,13 +100,14 @@ export default function CheckoutPage() {
                     : ""
                 }`}
               >
-                <label className="flex gap-4 cursor-pointer">
+                <label className="flex flex-col sm:flex-row gap-4 cursor-pointer">
                   <input
                     type="radio"
                     checked={selected === a.id}
                     onChange={() => setSelected(a.id)}
-                    className="accent-yellow-400"
+                    className="accent-yellow-400 mt-1 shrink-0"
                   />
+
                   <div>
                     <p className="font-semibold text-white">
                       {a.first_name} {a.last_name}
@@ -125,7 +140,7 @@ export default function CheckoutPage() {
         </button>
 
         {showForm && (
-          <div className="grid grid-cols-2 gap-4 mb-10 bg-[#111111] p-6 rounded-2xl border border-[#2A2A2A]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 bg-[#111111] p-6 rounded-2xl border border-[#2A2A2A]">
             {[
               ["first_name", "First Name"],
               ["last_name", "Last Name"],
@@ -145,7 +160,7 @@ export default function CheckoutPage() {
 
             <textarea
               placeholder="Full Address"
-              className="bg-[#222222] border border-[#333333] text-white p-3 rounded-lg col-span-2 outline-none focus:ring-2 focus:ring-yellow-400"
+              className="bg-[#222222] border border-[#333333] text-white p-3 rounded-lg sm:col-span-2 outline-none focus:ring-2 focus:ring-yellow-400"
               onChange={(e) =>
                 setForm({ ...form, address: e.target.value })
               }
@@ -153,7 +168,7 @@ export default function CheckoutPage() {
 
             <button
               onClick={saveAddress}
-              className="col-span-2 bg-yellow-500 text-black font-semibold py-3 rounded-full hover:bg-yellow-400 transition-all duration-300"
+              className="sm:col-span-2 bg-yellow-500 text-black font-semibold py-3 rounded-full hover:bg-yellow-400 transition-all duration-300"
             >
               Save Address
             </button>
@@ -161,12 +176,12 @@ export default function CheckoutPage() {
         )}
 
         {/* PAYMENT SECTION */}
-        <div className="border-t border-[#2A2A2A] pt-10 mt-10 flex justify-between items-center">
+        <div className="border-t border-[#2A2A2A] pt-10 mt-10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6">
           <p className="text-3xl font-bold text-yellow-300">
             Total: ₹{totalPrice}
           </p>
 
-          <button className="bg-yellow-500 text-black font-semibold px-10 py-3 rounded-full hover:bg-yellow-400 transition-all duration-300">
+          <button className="bg-yellow-500 text-black font-semibold px-8 sm:px-10 py-3 rounded-full hover:bg-yellow-400 transition-all duration-300 w-full sm:w-auto">
             Proceed to Pay
           </button>
         </div>
