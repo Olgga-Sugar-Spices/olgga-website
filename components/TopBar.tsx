@@ -6,7 +6,7 @@ export default function TopBar() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 gap-1">
           
           <p className="text-center sm:text-left break-words">
-            🌿 Premium Quality Spices & Sugars 
+            🌿 Premium Quality Spices, Dryfruits & Sugars
             <span className="hidden sm:inline"> | </span>
             <span className="block sm:inline">
               Free shipping on orders above ₹500
