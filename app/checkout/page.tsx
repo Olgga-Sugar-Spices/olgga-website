@@ -15,12 +15,30 @@ type Address = {
   is_default: boolean;
 };
 
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
 export default function CheckoutPage() {
   const { totalPrice } = useCart();
+
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [form, setForm] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
+
+  // LOAD RAZORPAY SCRIPT
+  useEffect(() => {
+    const script = document.createElement("script");
+
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+
+    script.async = true;
+
+    document.body.appendChild(script);
+  }, []);
 
   async function fetchAddresses() {
     const {
@@ -36,7 +54,10 @@ export default function CheckoutPage() {
       .order("is_default", { ascending: false });
 
     setAddresses(data || []);
-    if (data?.length) setSelected(data[0].id);
+
+    if (data?.length) {
+      setSelected(data[0].id);
+    }
   }
 
   useEffect(() => {
@@ -60,6 +81,7 @@ export default function CheckoutPage() {
 
     setShowForm(false);
     setForm({});
+
     fetchAddresses();
   }
 
@@ -76,6 +98,203 @@ export default function CheckoutPage() {
     fetchAddresses();
   }
 
+  // PAYMENT FUNCTION
+  async function handlePayment() {
+  try {
+    if (!selected) {
+      alert("Please select an address");
+      return;
+    }
+
+    const selectedAddress = addresses.find(
+      (a) => a.id === selected
+    );
+
+    // CREATE ORDER
+    const res = await fetch("/api/create-order", {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        amount: totalPrice,
+      }),
+    });
+
+    const order = await res.json();
+
+    if (!order.id) {
+      alert("Failed to create order");
+      return;
+    }
+
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+
+      amount: order.amount,
+
+      currency: order.currency,
+
+      name: "Olgga Sugar & Spices",
+
+      description: "Order Payment",
+
+      order_id: order.id,
+
+      handler: async function (response: any) {
+        try {
+          // VERIFY PAYMENT
+          const verifyRes = await fetch(
+            "/api/verify-payment",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type": "application/json",
+              },
+
+              body: JSON.stringify(response),
+            }
+          );
+
+          const verifyData = await verifyRes.json();
+
+          if (verifyData.success) {
+
+  // GET USER
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("User not found");
+    return;
+  }
+
+  const selectedAddress = addresses.find(
+    (a) => a.id === selected
+  );
+
+  // CREATE ORDER
+  const { data: orderData, error: orderError } =
+    await supabase
+      .from("orders")
+      .insert({
+        user_id: user.id,
+
+        razorpay_order_id:
+          response.razorpay_order_id,
+
+        razorpay_payment_id:
+          response.razorpay_payment_id,
+
+        total_amount: totalPrice,
+
+        status: "paid",
+
+        first_name: selectedAddress?.first_name,
+        last_name: selectedAddress?.last_name,
+        email: selectedAddress?.email,
+        phone: selectedAddress?.phone,
+        address: selectedAddress?.address,
+        pincode: selectedAddress?.pincode,
+      })
+      .select()
+      .single();
+
+  if (orderError || !orderData) {
+    console.error(orderError);
+
+    alert("Failed to save order");
+
+    return;
+  }
+
+  // GET CART ITEMS
+  const { data: cartItems } = await supabase
+    .from("cart_items")
+    .select(`
+      quantity,
+      product:product_id (
+        id,
+        name,
+        price
+      )
+    `)
+    .eq("user_id", user.id);
+
+  // SAVE ORDER ITEMS
+  if (cartItems?.length) {
+
+    const orderItems = cartItems.map(
+      (item: any) => ({
+        order_id: orderData.id,
+
+        product_id: item.product.id,
+
+        product_name: item.product.name,
+
+        price: item.product.price,
+
+        quantity: item.quantity,
+      })
+    );
+
+    await supabase
+      .from("order_items")
+      .insert(orderItems);
+  }
+
+  // CLEAR CART
+  await supabase
+    .from("cart_items")
+    .delete()
+    .eq("user_id", user.id);
+
+  alert("Payment Successful!");
+
+  window.location.href = "/cart";
+}else {
+            alert("Payment Verification Failed");
+          }
+
+        } catch (err) {
+          console.error(err);
+
+          alert("Verification failed");
+        }
+      },
+
+      prefill: {
+        name: `${selectedAddress?.first_name} ${selectedAddress?.last_name}`,
+
+        email: selectedAddress?.email,
+
+        contact: selectedAddress?.phone,
+      },
+
+      notes: {
+        address: selectedAddress?.address,
+      },
+
+      theme: {
+        color: "#EAB308",
+      },
+    };
+
+    const razorpay = new window.Razorpay(options);
+
+    razorpay.open();
+
+  } catch (err) {
+    console.error(err);
+
+    alert("Something went wrong");
+  }
+}
+
   return (
     <div className="bg-black min-h-screen">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -87,6 +306,7 @@ export default function CheckoutPage() {
         {/* SAVED ADDRESSES */}
         {addresses.length > 0 && (
           <div className="space-y-6 mb-10">
+
             <h2 className="text-xl font-semibold text-white">
               Saved Addresses
             </h2>
@@ -101,6 +321,7 @@ export default function CheckoutPage() {
                 }`}
               >
                 <label className="flex flex-col sm:flex-row gap-4 cursor-pointer">
+
                   <input
                     type="radio"
                     checked={selected === a.id}
@@ -112,9 +333,18 @@ export default function CheckoutPage() {
                     <p className="font-semibold text-white">
                       {a.first_name} {a.last_name}
                     </p>
-                    <p className="text-gray-400">{a.address}</p>
-                    <p className="text-gray-400">{a.pincode}</p>
-                    <p className="text-gray-400">{a.phone}</p>
+
+                    <p className="text-gray-400">
+                      {a.address}
+                    </p>
+
+                    <p className="text-gray-400">
+                      {a.pincode}
+                    </p>
+
+                    <p className="text-gray-400">
+                      {a.phone}
+                    </p>
                   </div>
                 </label>
 
@@ -131,7 +361,7 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* ADD NEW ADDRESS */}
+        {/* ADD ADDRESS BUTTON */}
         <button
           onClick={() => setShowForm(!showForm)}
           className="mb-8 text-yellow-400 font-semibold hover:text-yellow-300 transition"
@@ -139,8 +369,10 @@ export default function CheckoutPage() {
           + Add New Address
         </button>
 
+        {/* ADDRESS FORM */}
         {showForm && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 bg-[#111111] p-6 rounded-2xl border border-[#2A2A2A]">
+
             {[
               ["first_name", "First Name"],
               ["last_name", "Last Name"],
@@ -153,7 +385,10 @@ export default function CheckoutPage() {
                 placeholder={label}
                 className="bg-[#222222] border border-[#333333] text-white p-3 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400"
                 onChange={(e) =>
-                  setForm({ ...form, [key]: e.target.value })
+                  setForm({
+                    ...form,
+                    [key]: e.target.value,
+                  })
                 }
               />
             ))}
@@ -162,7 +397,10 @@ export default function CheckoutPage() {
               placeholder="Full Address"
               className="bg-[#222222] border border-[#333333] text-white p-3 rounded-lg sm:col-span-2 outline-none focus:ring-2 focus:ring-yellow-400"
               onChange={(e) =>
-                setForm({ ...form, address: e.target.value })
+                setForm({
+                  ...form,
+                  address: e.target.value,
+                })
               }
             />
 
@@ -177,13 +415,18 @@ export default function CheckoutPage() {
 
         {/* PAYMENT SECTION */}
         <div className="border-t border-[#2A2A2A] pt-10 mt-10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6">
+
           <p className="text-3xl font-bold text-yellow-300">
             Total: ₹{totalPrice}
           </p>
 
-          <button className="bg-yellow-500 text-black font-semibold px-8 sm:px-10 py-3 rounded-full hover:bg-yellow-400 transition-all duration-300 w-full sm:w-auto">
+          <button
+            onClick={handlePayment}
+            className="bg-yellow-500 text-black font-semibold px-8 sm:px-10 py-3 rounded-full hover:bg-yellow-400 transition-all duration-300 w-full sm:w-auto"
+          >
             Proceed to Pay
           </button>
+
         </div>
 
       </div>
