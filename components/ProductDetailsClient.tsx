@@ -4,13 +4,20 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { ShieldCheck, Truck, Leaf } from "lucide-react";
 import { useRouter } from "next/navigation";
-
+import { useState } from "react";
 export default function ProductDetailsClient({
   product,
 }: {
   product: any;
 }) {
   const router = useRouter();
+  const images =
+  product.images?.length > 0
+    ? product.images
+    : [product.image];
+
+const [selectedImage, setSelectedImage] =
+  useState(images[0]);
 
   const {
     items,
@@ -49,18 +56,52 @@ export default function ProductDetailsClient({
 
         {/* IMAGE SECTION */}
 
-        <div>
-          <div className="bg-[#111111] rounded-3xl p-8 flex items-center justify-center min-h-[650px]">
-            <Image
-              src={product.image}
-              alt={product.name}
-              width={700}
-              height={700}
-              priority
-              className="object-contain max-h-[600px] hover:scale-105 transition duration-500"
-            />
-          </div>
-        </div>
+        {/* IMAGE SECTION */}
+
+<div className="flex gap-4">
+
+  {/* THUMBNAILS */}
+
+  <div className="flex flex-col gap-3">
+
+    {images.map((img: string, index: number) => (
+      <button
+        key={index}
+        onClick={() => setSelectedImage(img)}
+        className={`w-20 h-20 rounded-2xl overflow-hidden border transition ${
+          selectedImage === img
+            ? "border-yellow-500"
+            : "border-[#2A2A2A]"
+        }`}
+      >
+        <Image
+          src={img}
+          alt={`${product.name}-${index}`}
+          width={80}
+          height={80}
+          className="w-full h-full object-cover"
+        />
+      </button>
+    ))}
+
+  </div>
+
+  {/* MAIN IMAGE */}
+
+  <div className="flex-1 bg-[#111111] rounded-3xl p-8 flex items-center justify-center min-h-[650px]">
+
+    <Image
+      src={selectedImage}
+      alt={product.name}
+      width={700}
+      height={700}
+      priority
+      className="object-contain max-h-[600px] hover:scale-105 transition duration-500"
+    />
+
+  </div>
+
+</div>
 
         {/* DETAILS */}
 
