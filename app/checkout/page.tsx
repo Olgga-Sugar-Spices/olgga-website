@@ -86,9 +86,7 @@ export default function CheckoutPage() {
   }
 
   async function setDefault(id: string) {
-    await supabase
-      .from("addresses")
-      .update({ is_default: false });
+    await supabase.from("addresses").update({ is_default: false });
 
     await supabase
       .from("addresses")
@@ -100,55 +98,51 @@ export default function CheckoutPage() {
 
   // PAYMENT FUNCTION
   async function handlePayment() {
-  try {
-    if (!selected) {
-      alert("Please select an address");
-      return;
-    }
+    try {
+      if (!selected) {
+        alert("Please select an address");
+        return;
+      }
 
-    const selectedAddress = addresses.find(
-      (a) => a.id === selected
-    );
+      const selectedAddress = addresses.find((a) => a.id === selected);
 
-    // CREATE ORDER
-    const res = await fetch("/api/create-order", {
-      method: "POST",
+      // CREATE ORDER
+      const res = await fetch("/api/create-order", {
+        method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-      body: JSON.stringify({
-        amount: totalPrice,
-      }),
-    });
+        body: JSON.stringify({
+          amount: totalPrice,
+        }),
+      });
 
-    const order = await res.json();
+      const order = await res.json();
 
-    if (!order.id) {
-      alert("Failed to create order");
-      return;
-    }
+      if (!order.id) {
+        alert("Failed to create order");
+        return;
+      }
 
-    const options = {
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
 
-      amount: order.amount,
+        amount: order.amount,
 
-      currency: order.currency,
+        currency: order.currency,
 
-      name: "Olgga Sugar & Spices",
+        name: "Olgga Sugar & Spices",
 
-      description: "Order Payment",
+        description: "Order Payment",
 
-      order_id: order.id,
+        order_id: order.id,
 
-      handler: async function (response: any) {
-        try {
-          // VERIFY PAYMENT
-          const verifyRes = await fetch(
-            "/api/verify-payment",
-            {
+        handler: async function (response: any) {
+          try {
+            // VERIFY PAYMENT
+            const verifyRes = await fetch("/api/verify-payment", {
               method: "POST",
 
               headers: {
@@ -156,157 +150,163 @@ export default function CheckoutPage() {
               },
 
               body: JSON.stringify(response),
+            });
+
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success) {
+              // GET USER
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+
+              if (!user) {
+                alert("User not found");
+                return;
+              }
+
+              const selectedAddress = addresses.find((a) => a.id === selected);
+
+              // CREATE ORDER
+              const { data: orderData, error: orderError } = await supabase
+                .from("orders")
+                .insert({
+                  user_id: user.id,
+
+                  razorpay_order_id: response.razorpay_order_id,
+
+                  razorpay_payment_id: response.razorpay_payment_id,
+
+                  total_amount: totalPrice,
+
+                  status: "paid",
+
+                  first_name: selectedAddress?.first_name,
+                  last_name: selectedAddress?.last_name,
+                  email: selectedAddress?.email,
+                  phone: selectedAddress?.phone,
+                  address: selectedAddress?.address,
+                  pincode: selectedAddress?.pincode,
+                })
+                .select()
+                .single();
+
+              if (orderError || !orderData) {
+                console.error(orderError);
+
+                alert("Failed to save order");
+
+                return;
+              }
+
+              // GET CART ITEMS
+              const { data: cartItems } = await supabase
+                .from("cart_items")
+                .select(
+                  `
+                  quantity,
+                  product:product_id (
+                    id,
+                    name,
+                    price
+                  )
+                `
+                )
+                .eq("user_id", user.id);
+
+              // SAVE ORDER ITEMS
+              if (cartItems?.length) {
+                const orderItems = cartItems.map((item: any) => ({
+                  order_id: orderData.id,
+
+                  product_id: item.product.id,
+
+                  product_name: item.product.name,
+
+                  price: item.product.price,
+
+                  quantity: item.quantity,
+                }));
+
+                await supabase.from("order_items").insert(orderItems);
+
+                // --- NEW: SEND INVOICE EMAILS ---
+                try {
+                  await fetch("/api/send-invoice", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      orderId: response.razorpay_order_id,
+                      customerName: `${selectedAddress?.first_name} ${selectedAddress?.last_name}`,
+                      customerEmail: selectedAddress?.email,
+                      totalAmount: totalPrice,
+                      items: orderItems.map((oi) => ({
+                        name: oi.product_name,
+                        quantity: oi.quantity,
+                        price: oi.price,
+                      })),
+                    }),
+                  });
+                } catch (emailError) {
+                  console.error(
+                    "Invoice email failed to send, but order was saved.",
+                    emailError
+                  );
+                }
+                // --------------------------------
+              }
+
+              // CLEAR CART
+              await supabase.from("cart_items").delete().eq("user_id", user.id);
+
+              alert("Payment Successful!");
+
+              window.location.href = "/cart";
+            } else {
+              alert("Payment Verification Failed");
             }
-          );
+          } catch (err) {
+            console.error(err);
 
-          const verifyData = await verifyRes.json();
-
-          if (verifyData.success) {
-
-  // GET USER
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    alert("User not found");
-    return;
-  }
-
-  const selectedAddress = addresses.find(
-    (a) => a.id === selected
-  );
-
-  // CREATE ORDER
-  const { data: orderData, error: orderError } =
-    await supabase
-      .from("orders")
-      .insert({
-        user_id: user.id,
-
-        razorpay_order_id:
-          response.razorpay_order_id,
-
-        razorpay_payment_id:
-          response.razorpay_payment_id,
-
-        total_amount: totalPrice,
-
-        status: "paid",
-
-        first_name: selectedAddress?.first_name,
-        last_name: selectedAddress?.last_name,
-        email: selectedAddress?.email,
-        phone: selectedAddress?.phone,
-        address: selectedAddress?.address,
-        pincode: selectedAddress?.pincode,
-      })
-      .select()
-      .single();
-
-  if (orderError || !orderData) {
-    console.error(orderError);
-
-    alert("Failed to save order");
-
-    return;
-  }
-
-  // GET CART ITEMS
-  const { data: cartItems } = await supabase
-    .from("cart_items")
-    .select(`
-      quantity,
-      product:product_id (
-        id,
-        name,
-        price
-      )
-    `)
-    .eq("user_id", user.id);
-
-  // SAVE ORDER ITEMS
-  if (cartItems?.length) {
-
-    const orderItems = cartItems.map(
-      (item: any) => ({
-        order_id: orderData.id,
-
-        product_id: item.product.id,
-
-        product_name: item.product.name,
-
-        price: item.product.price,
-
-        quantity: item.quantity,
-      })
-    );
-
-    await supabase
-      .from("order_items")
-      .insert(orderItems);
-  }
-
-  // CLEAR CART
-  await supabase
-    .from("cart_items")
-    .delete()
-    .eq("user_id", user.id);
-
-  alert("Payment Successful!");
-
-  window.location.href = "/cart";
-}else {
-            alert("Payment Verification Failed");
+            alert("Verification failed");
           }
+        },
 
-        } catch (err) {
-          console.error(err);
+        prefill: {
+          name: `${selectedAddress?.first_name} ${selectedAddress?.last_name}`,
 
-          alert("Verification failed");
-        }
-      },
+          email: selectedAddress?.email,
 
-      prefill: {
-        name: `${selectedAddress?.first_name} ${selectedAddress?.last_name}`,
+          contact: selectedAddress?.phone,
+        },
 
-        email: selectedAddress?.email,
+        notes: {
+          address: selectedAddress?.address,
+        },
 
-        contact: selectedAddress?.phone,
-      },
+        theme: {
+          color: "#EAB308",
+        },
+      };
 
-      notes: {
-        address: selectedAddress?.address,
-      },
+      const razorpay = new window.Razorpay(options);
 
-      theme: {
-        color: "#EAB308",
-      },
-    };
+      razorpay.open();
+    } catch (err) {
+      console.error(err);
 
-    const razorpay = new window.Razorpay(options);
-
-    razorpay.open();
-
-  } catch (err) {
-    console.error(err);
-
-    alert("Something went wrong");
+      alert("Something went wrong");
+    }
   }
-}
 
   return (
     <div className="bg-black min-h-screen">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-
-        <h1 className="text-4xl font-bold mb-10 text-yellow-300">
-          Checkout
-        </h1>
+        <h1 className="text-4xl font-bold mb-10 text-yellow-300">Checkout</h1>
 
         {/* SAVED ADDRESSES */}
         {addresses.length > 0 && (
           <div className="space-y-6 mb-10">
-
             <h2 className="text-xl font-semibold text-white">
               Saved Addresses
             </h2>
@@ -315,13 +315,10 @@ export default function CheckoutPage() {
               <div
                 key={a.id}
                 className={`bg-[#1A1A1A] border border-[#2A2A2A] p-6 rounded-2xl transition-all duration-300 ${
-                  selected === a.id
-                    ? "border-yellow-400 shadow-lg"
-                    : ""
+                  selected === a.id ? "border-yellow-400 shadow-lg" : ""
                 }`}
               >
                 <label className="flex flex-col sm:flex-row gap-4 cursor-pointer">
-
                   <input
                     type="radio"
                     checked={selected === a.id}
@@ -334,17 +331,11 @@ export default function CheckoutPage() {
                       {a.first_name} {a.last_name}
                     </p>
 
-                    <p className="text-gray-400">
-                      {a.address}
-                    </p>
+                    <p className="text-gray-400">{a.address}</p>
 
-                    <p className="text-gray-400">
-                      {a.pincode}
-                    </p>
+                    <p className="text-gray-400">{a.pincode}</p>
 
-                    <p className="text-gray-400">
-                      {a.phone}
-                    </p>
+                    <p className="text-gray-400">{a.phone}</p>
                   </div>
                 </label>
 
@@ -372,7 +363,6 @@ export default function CheckoutPage() {
         {/* ADDRESS FORM */}
         {showForm && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 bg-[#111111] p-6 rounded-2xl border border-[#2A2A2A]">
-
             {[
               ["first_name", "First Name"],
               ["last_name", "Last Name"],
@@ -415,7 +405,6 @@ export default function CheckoutPage() {
 
         {/* PAYMENT SECTION */}
         <div className="border-t border-[#2A2A2A] pt-10 mt-10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6">
-
           <p className="text-3xl font-bold text-yellow-300">
             Total: ₹{totalPrice}
           </p>
@@ -426,9 +415,7 @@ export default function CheckoutPage() {
           >
             Proceed to Pay
           </button>
-
         </div>
-
       </div>
     </div>
   );
